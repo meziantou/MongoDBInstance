@@ -1,0 +1,86 @@
+name: publish
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+    tags:
+      - '*'
+  pull_request:
+    branches:
+      - '*'
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+  NuGetDirectory: ${{ github.workspace}}/nuget
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  create_nuget:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core (latest)
+      uses: actions/setup-dotnet@v2
+    - run: ./MongoDBInstance/DownloadBinaries.ps1
+    - run: dotnet build MongoDBInstance/MongoDBInstance.csproj --configuration Release
+    - run: dotnet pack MongoDBInstance/MongoDBInstance.csproj --configuration Release --output ${{ env.NuGetDirectory }}
+    - uses: actions/upload-artifact@v2
+      with:
+        name: nuget
+        if-no-files-found: error
+        retention-days: 7
+        path: ${{ env.NuGetDirectory }}/**/*
+
+  tests:
+    strategy:
+      matrix:
+        os: [
+          'windows-2022',
+          'windows-2019',
+          'ubuntu-20.04',
+          'ubuntu-18.04',
+          'macos-11',
+          'macos-10.15'
+        ]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core (latest)
+      uses: actions/setup-dotnet@v2
+    - run: ./MongoDBInstance/DownloadBinaries.ps1
+    - run: dotnet pack MongoDBInstance/MongoDBInstance.csproj --configuration Debug /p:Version=9999.9.9
+    - run: dotnet test --configuration Debug
+      name: Run tests
+
+  deploy:
+    runs-on: 'ubuntu-20.04'
+    needs: [ create_nuget, tests ]
+    steps:
+    - uses: actions/download-artifact@v2
+      with:
+        name: nuget
+        path: ${{ env.NuGetDirectory }}
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v2
+    - run: |
+        Write-Host "Current ref: $env:GITHUB_REF"
+        Write-Host "Searching nupkg in folder: ${{ env.NuGetDirectory }}"
+        $files = Get-ChildItem "${{ env.NuGetDirectory }}/*" -Include *.nupkg
+        foreach($file in $files) {
+            if ($env:GITHUB_REF -eq 'refs/heads/main')
+            {
+              Write-Host "Pushing NuGet package: $($file.FullName)"
+              & dotnet nuget push "$($file.FullName)" --api-key "${{ secrets.NUGET_APIKEY }}" --source https://api.nuget.org/v3/index.json --force-english-output --skip-duplicate
+            }
+            else
+            {
+              Write-Host "Not on a tag => Do not push: $($file.FullName)"
+            }
+        }
+      name: Publish NuGet packages

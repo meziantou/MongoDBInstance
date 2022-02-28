@@ -1,0 +1,7 @@
+﻿<Project>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)\..\binaries\*" Visible="false" Condition="$(CopyMongoExecutables) != 'false'">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>
