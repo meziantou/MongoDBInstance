@@ -16,7 +16,7 @@ public sealed partial class MongoDBInstance : IAsyncDisposable
     public event EventHandler<MongoDataReceivedEventArgs>? MongoOutput;
 
     public int Port { get; set; } = 27017;
-    public bool EnableIPv6 { get; set; } = true;
+    public bool EnableIPv6 { get; set; }
     public string? StorageEngine { get; set; } = "ephemeralForTest";
     public bool EnableMajorityReadConcern { get; set; }
 
@@ -59,11 +59,14 @@ public sealed partial class MongoDBInstance : IAsyncDisposable
             if (OperatingSystem.IsWindows())
                 return Path.Join(rootPath, MongoDBWindowsFileName);
 
-            if (OperatingSystem.IsLinux() && OperatingSystem.IsIOSVersionAtLeast(5, 5))
+            if (MongoDBUbuntu2004Filename != null && OperatingSystem.IsLinux() && OperatingSystem.IsIOSVersionAtLeast(5, 5))
                 return Path.Join(rootPath, MongoDBUbuntu2004Filename);
 
-            if (OperatingSystem.IsLinux())
+            if (MongoDBUbuntu1804Filename != null && OperatingSystem.IsLinux())
                 return Path.Join(rootPath, MongoDBUbuntu1804Filename);
+
+            if (MongoDBUbuntu1604Filename != null && OperatingSystem.IsLinux())
+                return Path.Join(rootPath, MongoDBUbuntu1604Filename);
 
             if (OperatingSystem.IsMacOS())
                 return Path.Join(rootPath, MongoDBMacOSFilename);

@@ -1,21 +1,27 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <RestoreSources>$(MSBuildThisFileDirectory)\..\MongoDBInstance\bin\Debug;https://api.nuget.org/v3/index.json</RestoreSources>
+    <MongoDBPackageVersion Condition="'$(MongoDBBranch)' == '34'">2.13.3</MongoDBPackageVersion>
+    <MongoDBPackageVersion Condition="'$(MongoDBPackageVersion)' == ''">2.14.1</MongoDBPackageVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.11.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.1.0" />
     <PackageReference Include="xunit" Version="2.4.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="MongoDB.Driver" Version="2.14.1" />
+    <PackageReference Include="MongoDB.Driver" Version="$(MongoDBPackageVersion)" />
     <PackageReference Include="MongoDBInstance" Version="9999.9.9" />
   </ItemGroup>
+
+  <Target Name="DebugMongoDBVersion" BeforeTargets="Build">
+    <Message Importance="high" Text="Using MongoDB Driver $(MongoDBPackageVersion)"></Message>
+  </Target>
 
 </Project>

@@ -21,14 +21,22 @@ defaults:
 
 jobs:
   create_nuget:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-20.04    
+    strategy:
+      matrix:
+        include:
+        - mongodbVersion: '34'
+          nugetPackageId: 'MongoDBInstance3_4'
+        - mongodbVersion: '50'
+          nugetPackageId: 'MongoDBInstance5_0'
+      fail-fast: false
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET Core (latest)
       uses: actions/setup-dotnet@v2
-    - run: ./MongoDBInstance/DownloadBinaries.ps1
+    - run: ./MongoDBInstance/DownloadBinaries${{ matrix.mongodbVersion }}.ps1
     - run: dotnet build MongoDBInstance/MongoDBInstance.csproj --configuration Release
-    - run: dotnet pack MongoDBInstance/MongoDBInstance.csproj --configuration Release --output ${{ env.NuGetDirectory }}
+    - run: dotnet pack MongoDBInstance/MongoDBInstance.csproj --configuration Release --output ${{ env.NuGetDirectory }} /p:PackageId=${{ matrix.nugetPackageId }}
     - uses: actions/upload-artifact@v2
       with:
         name: nuget
@@ -39,6 +47,7 @@ jobs:
   tests:
     strategy:
       matrix:
+        mongodbVersion: ['34', '50']
         os: [
           'windows-2022',
           'windows-2019',
@@ -47,15 +56,31 @@ jobs:
           'macos-11',
           'macos-10.15'
         ]
+        include:
+        - mongodbVersion: '34'
+          os: 'ubuntu-latest'
+          container: 'mcr.microsoft.com/dotnet/sdk:6.0'
+        - mongodbVersion: '50'
+          os: 'ubuntu-latest'
+          container: 'mcr.microsoft.com/dotnet/sdk:6.0'
       fail-fast: false
     runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET Core (latest)
       uses: actions/setup-dotnet@v2
-    - run: ./MongoDBInstance/DownloadBinaries.ps1
+    - if: matrix.mongodbVersion == '34' && startsWith(matrix.os, 'ubuntu') && matrix.container == ''
+      run: |
+        wget http://security.ubuntu.com/ubuntu/pool/main/o/openssl1.0/libssl1.0.0_1.0.2n-1ubuntu5.7_amd64.deb
+        sudo apt install ./libssl1.0.0_1.0.2n-1ubuntu5.7_amd64.deb
+    - if: matrix.container != ''
+      run: |
+        wget http://security.ubuntu.com/ubuntu/pool/main/o/openssl1.0/libssl1.0.0_1.0.2n-1ubuntu5.7_amd64.deb
+        apt install ./libssl1.0.0_1.0.2n-1ubuntu5.7_amd64.deb
+    - run: ./MongoDBInstance/DownloadBinaries${{ matrix.mongodbVersion }}.ps1
     - run: dotnet pack MongoDBInstance/MongoDBInstance.csproj --configuration Debug /p:Version=9999.9.9
-    - run: dotnet test --configuration Debug
+    - run: dotnet test --configuration Debug /p:MongoDBBranch=${{matrix.mongodbVersion}}
       name: Run tests
 
   deploy:
