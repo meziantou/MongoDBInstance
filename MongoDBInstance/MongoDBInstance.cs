@@ -8,6 +8,7 @@ namespace MongoDBInstances;
 
 public sealed partial class MongoDBInstance : IAsyncDisposable
 {
+    private readonly object _startLock = new();
     private Process? _process;
     private JobObject? _jobObject;
     private string? _dbPath;
@@ -31,6 +32,8 @@ public sealed partial class MongoDBInstance : IAsyncDisposable
     public string? MongoPath { get; set; }
 
     public string ConnectionString => "mongodb://127.0.0.1:" + Port.ToString(CultureInfo.InvariantCulture);
+
+    public bool IsRunning => _process != null;
 
     private string GetBinaryLocation()
     {
@@ -76,86 +79,91 @@ public sealed partial class MongoDBInstance : IAsyncDisposable
     }
 
     [SuppressMessage("Design", "MA0051:Method is too long", Justification = "<Pending>")]
-    public ValueTask StartAsync()
+    public void Start()
     {
         if (_process != null)
             throw new InvalidOperationException("The process is already running");
 
-        if (DatabasePath != null)
+        lock (_startLock)
         {
-            _dbPath = DatabasePath;
-            _dbPathMustBeDeleted = false;
-        }
-        else
-        {
-            _dbPathMustBeDeleted = true;
-            _dbPath = Path.Join(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-        }
+            if (_process != null)
+                throw new InvalidOperationException("The process is already running");
 
-        Directory.CreateDirectory(_dbPath);
-        var psi = new ProcessStartInfo
-        {
-            FileName = GetBinaryLocation(),
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            RedirectStandardInput = false,
-            CreateNoWindow = true,
-            ErrorDialog = false,
-            ArgumentList =
+            if (DatabasePath != null)
             {
-                "--port", Port.ToString(CultureInfo.InvariantCulture),
-                "--noauth",
-                "--dbpath", _dbPath,
-            },
-        };
-
-        if (EnableIPv6)
-        {
-            psi.ArgumentList.Add("--ipv6");
-        }
-
-        if (EnableMajorityReadConcern)
-        {
-            psi.ArgumentList.Add("--enableMajorityReadConcern=1");
-        }
-
-        if (StorageEngine != null)
-        {
-            psi.ArgumentList.Add("--storageEngine");
-            psi.ArgumentList.Add(StorageEngine);
-        }
-
-
-        if (OperatingSystem.IsLinux())
-        {
-            var unixFileInfo = new UnixFileInfo(psi.FileName);
-            unixFileInfo.FileAccessPermissions |= FileAccessPermissions.UserExecute;
-        }
-
-        _process = new Process() { StartInfo = psi };
-        _process.OutputDataReceived += OnOutputDataReceived;
-        _process.ErrorDataReceived += OnErrorDataReceived;
-        if (!_process.Start())
-        {
-            _process.Dispose();
-            _process = null;
-            throw new InvalidOperationException("Cannot start the process");
-        }
-
-        if (OperatingSystem.IsWindows())
-        {
-            _jobObject = new JobObject();
-            _jobObject.SetLimits(new JobObjectLimits
+                _dbPath = DatabasePath;
+                _dbPathMustBeDeleted = false;
+            }
+            else
             {
-                Flags = JobObjectLimitFlags.KillOnJobClose,
-            });
-            _jobObject.AssignProcess(_process);
-        }
+                _dbPathMustBeDeleted = true;
+                _dbPath = Path.Join(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            }
 
-        _process.BeginOutputReadLine();
-        _process.BeginErrorReadLine();
-        return ValueTask.CompletedTask;
+            Directory.CreateDirectory(_dbPath);
+            var psi = new ProcessStartInfo
+            {
+                FileName = GetBinaryLocation(),
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                RedirectStandardInput = false,
+                CreateNoWindow = true,
+                ErrorDialog = false,
+                ArgumentList =
+                {
+                    "--port", Port.ToString(CultureInfo.InvariantCulture),
+                    "--noauth",
+                    "--dbpath", _dbPath,
+                },
+            };
+
+            if (EnableIPv6)
+            {
+                psi.ArgumentList.Add("--ipv6");
+            }
+
+            if (EnableMajorityReadConcern)
+            {
+                psi.ArgumentList.Add("--enableMajorityReadConcern=1");
+            }
+
+            if (StorageEngine != null)
+            {
+                psi.ArgumentList.Add("--storageEngine");
+                psi.ArgumentList.Add(StorageEngine);
+            }
+
+
+            if (OperatingSystem.IsLinux())
+            {
+                var unixFileInfo = new UnixFileInfo(psi.FileName);
+                unixFileInfo.FileAccessPermissions |= FileAccessPermissions.UserExecute;
+            }
+
+            _process = new Process() { StartInfo = psi };
+            _process.OutputDataReceived += OnOutputDataReceived;
+            _process.ErrorDataReceived += OnErrorDataReceived;
+            if (!_process.Start())
+            {
+                _process.Dispose();
+                _process = null;
+                throw new InvalidOperationException("Cannot start the process");
+            }
+
+            if (OperatingSystem.IsWindows())
+            {
+                _jobObject = new JobObject();
+                _jobObject.SetLimits(new JobObjectLimits
+                {
+                    Flags = JobObjectLimitFlags.KillOnJobClose,
+                });
+                _jobObject.AssignProcess(_process);
+            }
+
+            _process.BeginOutputReadLine();
+            _process.BeginErrorReadLine();
+        }
     }
 
     private void OnOutputDataReceived(object sender, DataReceivedEventArgs e)

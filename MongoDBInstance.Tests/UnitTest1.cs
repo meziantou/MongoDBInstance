@@ -26,7 +26,7 @@ public class UnitTest1
         instance.MongoOutput += (sender, e) => _testOutputHelper.WriteLine(e.Source + ": " + e.Data);
 
         _testOutputHelper.WriteLine("starting");
-        await instance.StartAsync();
+        instance.Start();
 
         _testOutputHelper.WriteLine("connecting");
         var client = new MongoClient(instance.ConnectionString);

@@ -3,7 +3,6 @@
 $Version = "3.4.24"
 $binariesFolder = "$PSScriptRoot/binaries/";
 
-
 $WindowsDownloadUrl = "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-$Version.zip"
 $Ubuntu1604DownloadUrl = "https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-ubuntu1604-$Version.tgz"
 $MacOSDownloadUrl = "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-$Version.tgz"

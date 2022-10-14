@@ -1,6 +1,6 @@
 ﻿$ErrorActionPreference = 'Stop'
 
-$Version = "5.0.6"
+$Version = "5.0.13"
 $binariesFolder = "$PSScriptRoot/binaries/";
 
 $WindowsDownloadUrl = "https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-$Version.zip"
